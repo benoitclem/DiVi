@@ -21,6 +21,6 @@ class Project(Gtk.TreeView):
 		self.populate()
 
 	def populate(self):
-		i = self.store.append(None,[Gtk.STOCK_HARDDISK,self.name])
+		i = self.store.append(None,[Gtk.STOCK_OPEN,self.name])
 		self.store.append(i,[Gtk.STOCK_FILE,"file1"])
 		self.store.append(i,[Gtk.STOCK_FILE,"file1"])

@@ -4,6 +4,9 @@ from gi.repository import Gtk, Gdk
 from .Styles import Classic
 from .Drawables import *
 
+DRAG_ACTION = Gdk.DragAction.COPY
+
+
 class MouseButtons:
     LEFT_BUTTON = 1
     RIGHT_BUTTON = 3
@@ -20,7 +23,9 @@ class FlowGraph(Gtk.DrawingArea):
 
 	def __init__(self, name, parent = None, style = None):
 		Gtk.DrawingArea.__init__(self)
-
+		self.drag_dest_set(Gtk.DestDefaults.ALL, [Gtk.TargetEntry('STRING', Gtk.TargetFlags.SAME_APP, 0)], Gdk.DragAction.COPY)
+		self.connect('drag-data-received', self.onDragDataReceived)
+		
 		if style == None:
 			self.style = Classic()
 		else:
@@ -69,6 +74,9 @@ class FlowGraph(Gtk.DrawingArea):
 		| Gdk.EventMask.KEY_RELEASE_MASK
 		| Gdk.EventMask.POINTER_MOTION_MASK
 		| Gdk.EventMask.POINTER_MOTION_HINT_MASK)
+
+	def onDragDataReceived(self, widget, drag_context, x,y, data,info, time):
+		print(widget, drag_context, x,y, data,info, time)
 
 	def refresh(self):
 		if self.flowGraphChanged:
