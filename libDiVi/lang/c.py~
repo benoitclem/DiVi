@@ -1,0 +1,8 @@
+
+
+class lang:
+	
+	def getFonctions(self,data):
+		return None
+
+

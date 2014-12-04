@@ -20,8 +20,11 @@ class Block:
 		self.x = x
 		self.y = y
 
-	def draw(self):
-		print("Block object doesn't know how to draw itself")
+		self.subBlocks = []
+
+	def draw(self,cr):
+		for block in self.subBlocks:
+			block.draw(cr)
 
 	def relocate(self,x,y,method = "abs"):
 		global gridSize
@@ -81,11 +84,17 @@ class Circle(Block):
 			return super(Circle,self).isInside(x,y,x0,y0)
 		
 class Box(Block):
-	def __init__(self,xSize,ySize,x,y,style = None):
+	def __init__(self,xSize,ySize,x,y,style = None, name = None):
 		Block.__init__(self,x,y,style)
 		self.xSize = xSize
 		self.ySize = ySize
-		self.title = "BOX"
+		if name:
+			self.title = name
+		else:
+			self.title = "BOX"
+
+	def setTitle(self, name):
+		self.title = name
 
 	def draw(self, cr):
 
@@ -115,9 +124,109 @@ class Box(Block):
 	def isInside(self,x,y,x0 = None,y0 = None):
 		if (x0 == None) or (y0 == None):
 			return (x < (self.x+self.xSize/2)) and  (x > (self.x-self.xSize/2)) and\
-					(y < (self.y+self.ySize/2)) and  (y > (self.y-self.ySize/2))
+						(y < (self.y+self.ySize/2)) and  (y > (self.y-self.ySize/2))
 		else:
 			return super(Box,self).isInside(x,y,x0,y0)
+
+class Port(Block):
+	DIR_UP 		= 1
+	DIR_DOWN 	= 2
+	DIR_LEFT	= 3
+	DIR_RIGHT	= 4
+
+	SHAPE_ARROW  = 0
+	def __init__(self, x, y, size, direction, portType = None, portShape = SHAPE_ARROW, style = None):
+		Block.__init__(self,x,y,style)
+		self.direction = direction
+		self.shape = portShape
+		self.type = portType
+		self.size = size
+
+	def draw(self, cr):
+		# For Port the line width don't come with style
+		if self.focused:
+			cr.set_line_width(3)
+		else:
+			cr.set_line_width(2)
+		self.style.setLineColor(cr)
+		if self.shape == self.SHAPE_ARROW:
+			if self.direction == self.DIR_UP:
+				cr.move_to(self.x-self.size/2,self.y)
+				cr.line_to(self.x,self.y-self.size)
+				cr.line_to(self.x+self.size/2,self.y)
+			elif self.direction == self.DIR_DOWN:
+				cr.move_to(self.x-self.size/2,self.y)
+				cr.line_to(self.x,self.y+self.size)
+				cr.line_to(self.x+self.size/2,self.y)
+			elif self.direction == self.DIR_LEFT:
+				cr.move_to(self.x,self.y-self.size/2)
+				cr.line_to(self.x-self.size,self.y)
+				cr.line_to(self.x,self.y+self.size/2)
+			elif self.direction == self.DIR_RIGHT:
+				cr.move_to(self.x,self.y-self.size/2)
+				cr.line_to(self.x+self.size,self.y)
+				cr.line_to(self.x,self.y+self.size/2)
+			cr.close_path()
+			cr.stroke_preserve()
+
+			if self.type:
+				if self.type == int:
+					if self.selected:
+						self.style.setSelectedFillColorInt(cr)
+					else:
+						self.style.setFillColorInt(cr)
+			else:
+				if self.selected:
+					self.style.setSelectedFillColor(cr)
+				else:
+					self.style.setFillColor(cr)
+			cr.fill()
+			
+		else:
+			print("PORT TYPE is not defined... draw nothing")
+
+	def isInside(self,x,y,x0 = None,y0 = None):
+		if (x0 == None) or (y0 == None):
+			if self.direction == self.DIR_UP:
+				return (x < (self.x+self.size/2)) and  (x > (self.x-self.size/2)) and\
+						(y < (self.y)) and  (y > (self.y-self.size))
+			elif self.direction == self.DIR_DOW:
+				return (x < (self.x+self.size/2)) and  (x > (self.x-self.size/2)) and\
+						(y < (self.y+self.size/2)) and  (y > (self.y-self.size/2))
+			elif self.direction == self.DIR_LEFT:
+				return False
+			elif self.direction == self.DIR_RIGHT:
+				return False
+		else:
+			return super(Port,self).isInside(x,y,x0,y0)
+
+class BoxPort(Port):
+	def __init__(self, box, direction, portType = None, portShape = Port.SHAPE_ARROW, style = None):
+		Port.__init__(self, box.x-10, box.y-10, box.ySize/10, direction, portType, portShape, style)
+		box.subBlocks.append(self)
+
+class Connection(Block):
+	def __init__(self,x0,y0,x1,y1,style = None):
+		Block.__init__(self,x0,y0,style)
+		self.x1 = x1
+		self.y1 = y1
+		self.selected = False
+	
+	def draw(self, cr):
+		if self.focused:
+			self.style.setFocusedLineWidth(cr)
+		else:
+			self.style.setLineWidth(cr)
+		self.style.setLineColor(cr)
+		cr.move_to(self.x,self.y)
+		cr.line_to(self.x1,self.y1)
+		cr.stroke()
+
+	def isInside(self,x,y,x0 = None,y0 = None):
+		if (x0 == None) or (y0 == None):
+			return False
+		else:
+			return super(Connection,self).isInside(x,y,x0,y0)
 
 class Cartouche:
 	TOP_LEFT = 0

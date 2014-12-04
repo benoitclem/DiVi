@@ -16,7 +16,6 @@ class NameChooserDialog(Gtk.Dialog):
 		box.add(textBox)
 		self.show_all()
 
-
 class Library(Gtk.Paned):
 	def __init__(self,path):
 
@@ -33,24 +32,30 @@ class Library(Gtk.Paned):
 		editor = self.buildEditor()
 		self.add(editor)
 
-		self.populate(self.path)
+		self.populateFolder(self.path)
 
-	def populate(self, path, elem = None):
-		
+	def populateFolder(self, path, elem = None):
 		name = os.path.basename(path)
 		ldir = os.listdir(path)
 		for e in ldir:
-			subpath = path+'/'+e
+			subpath = path+'/'+e		
 			if os.path.isdir(subpath):
 				subElem = self.browserStore.append(elem,[e,"Folder"])
-				self.populate(subpath,subElem)
+				self.populateFolder(subpath,subElem)
 			else:
-				self.browserStore.append(elem,[e,"Function"])
+				subElem = self.browserStore.append(elem,[e,"Code"])
+				self.populateCode(subpath,subElem)
+
+	def populateCode(self, path, elem = None):
+		f = open(path)
+		content = f.read()
+		f.close()
+		#print(content)
 
 	def treeSelection(self, widget, row, col):
 		# Recover the path from tremmodelrow
 		path = self.getPathFromRow(row)
-		print(path)
+		# print(path)
 		# Display in editor
 		self.displayInEditor(path)
 
@@ -78,7 +83,7 @@ class Library(Gtk.Paned):
 	def getSelectedPath(self):
 		(model, i) = self.getSelectedIter()
 		if i:
-			print(model[i][0])
+			# print(model[i][0])
 			return self.getPathFromIter(model[i])
 		else:
 			return None
@@ -213,6 +218,7 @@ class Library(Gtk.Paned):
 		self.browserStore = Gtk.TreeStore(str,str) # name / description
 		self.browserTreeView = Gtk.TreeView(self.browserStore)
 		self.browserTreeView.set_headers_visible(False)
+
 		self.browserTreeView.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK,\
 														[('text/plain', 0, 0)],\
 														Gdk.DragAction.DEFAULT | Gdk.DragAction.MOVE)

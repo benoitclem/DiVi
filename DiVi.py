@@ -8,6 +8,8 @@ from libDiVi.ui.Library import *
 from libDiVi.ui.Project import *
 from libDiVi.ui.FlowGraph import *
 
+from libDiVi.lang.lang import *
+
 '''
 class DirReader:
 	def __init__(self, path):
@@ -47,9 +49,9 @@ class DiVi(Gtk.Window):
 			self.hpanpro.add(self.hpanlib)
 
 			self.fgs = Gtk.Notebook()
-			fg0 = FlowGraph("ONE")
-			fg1 = FlowGraph("TWO")
 			lib = Library("lib")
+			fg0 = FlowGraph("ONE",library=lib,language = c())
+			fg1 = FlowGraph("TWO",library=lib,language = c())
 
 			self.fgs.append_page(fg0,Gtk.Label(fg0.name))
 			self.fgs.append_page(fg1,Gtk.Label(fg1.name))

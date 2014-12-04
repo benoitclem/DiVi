@@ -19,12 +19,16 @@ class FlowGraph(Gtk.DrawingArea):
 	STATE_BLOCK_MOVED = 0x04
 
 	MODE_BLOCK = 98
-	MODE_CIRCLE = 99
+	MODE_CIRCLE = 115
+	MODE_CONNECTION = 99
+	MODE_PORT = 112
+	MODE_LIBRARY = 108
 
-	def __init__(self, name, parent = None, style = None):
+	def __init__(self, name, parent = None, style = None, library = None, language = None):
 		Gtk.DrawingArea.__init__(self)
-		self.drag_dest_set(Gtk.DestDefaults.ALL, [Gtk.TargetEntry('STRING', Gtk.TargetFlags.SAME_APP, 0)], Gdk.DragAction.COPY)
-		self.connect('drag-data-received', self.onDragDataReceived)
+		
+		#self.drag_dest_set(Gtk.DestDefaults.ALL, [Gtk.TargetEntry('STRING', Gtk.TargetFlags.SAME_APP, 0)], Gdk.DragAction.COPY)
+		#self.connect('drag-data-received', self.onDragDataReceived)
 		
 		if style == None:
 			self.style = Classic()
@@ -48,6 +52,9 @@ class FlowGraph(Gtk.DrawingArea):
 		self.selectionBox = None
 
 		self.mode = 0
+
+		self.library = library
+		self.language = language
 
 		self.currentState = self.STATE_IDLE
 		self.leftClickState = 0
@@ -103,12 +110,40 @@ class FlowGraph(Gtk.DrawingArea):
 		if self.selectionBox != None:
 			self.selectionBox.draw(cr)
 
+	def code2block(self,path):
+		if path:
+			f = open(path)
+			data = f.read()
+			f.close
+			if self.language:
+				funcs = self.language.getFunctions(data)
+				for func in funcs:
+					print(func)
+					return self.buildBlock(func['name'],func['return'],func['args'])
+
+	def strType2Type(self,s):
+		if s == 'int':
+			return int
+
+	# Use primitives to build a block
+	def buildBlock(self,name,ret,args):
+		(x,y) = (250,250)
+		b = Box(45,40,x,y,self.style, name = name)
+		rp = BoxPort(b,Port.DIR_UP,style=self.style)
+		return b
+			
+
 	def keyboardEvent(self, widget, event):
 		if event.type == Gdk.EventType.KEY_PRESS:
 			if self.myFocus:
-				self.mode = event.keyval
-				self.cartouches[3].title = "Mode is %c" %event.keyval
-				self.flowGraphChanged = True
+				if event.keyval == 65307:
+					print("Delete")
+					self.deleteSelectedBlocks()
+				else :
+					self.mode = event.keyval
+					self.cartouches[3].title = "Mode is %c" %event.keyval
+					self.flowGraphChanged = True
+
 			self.refresh()
 
 	def focusEvent(self, widget, event):
@@ -119,6 +154,15 @@ class FlowGraph(Gtk.DrawingArea):
 		else: # this is probably useless
 			self.myFocus = False
 
+	def selectIfInside(self,block,x0,y0,x1,y1):
+		# The block itself
+		if block.isInside(x0,y0,x1,y1):
+			block.selected = True
+		# The subblocks if exist
+		if block.subBlocks:
+			if self.selectIfInside(block.subBlocks,x0,y0,x1,y1):
+				block.subBlocks.selected = True
+
 	def mouseEvent(self, widget, event):
 		# print(event.type)
 		# We press the mouse
@@ -128,18 +172,28 @@ class FlowGraph(Gtk.DrawingArea):
 				self.leftClickState = 1
 				self.leftClickWhere = [event.x, event.y]
 				self.leftClickWhereBegin = [event.x, event.y]
-				# We are idle and with BLOCK or CICLE activated
+				# We are idle and with BLOCK | CICLE | PORT | CONNECTION activated
 				if self.currentState == self.STATE_IDLE and\
-					 (self.mode == self.MODE_BLOCK or self.mode == self.MODE_CIRCLE):
+					 (self.mode == self.MODE_BLOCK or self.mode == self.MODE_CIRCLE or self.mode == self.MODE_CONNECTION or self.mode == self.MODE_PORT or self.mode == self.MODE_LIBRARY):
 					block = None
 					if self.mode == self.MODE_BLOCK:			
 						block = Box(45,40,event.x,event.y,self.style)
 					elif self.mode == self.MODE_CIRCLE:
 						block = Circle(20,event.x,event.y,self.style)
-					self.blocks.append(block)
-					self.flowGraphChanged = True
-					self.currentState |= self.STATE_BLOCK_HOVER + self.STATE_BLOCK_ADDED
-					self.blockHovered = block
+					elif self.mode == self.MODE_CONNECTION:
+						block = Connection(event.x,event.y,event.x+10,event.y-60,self.style)
+					elif self.mode == self.MODE_PORT:
+						block = Port(event.x,event.y,5,Port.DIR_UP,portType = int, style=self.style)
+					elif self.mode == self.MODE_LIBRARY:
+						if self.library:
+							path = self.library.getSelectedPath()
+							print(path)
+							block = self.code2block(path);
+					if block:
+						self.blocks.append(block)
+						self.flowGraphChanged = True
+						self.currentState |= self.STATE_BLOCK_HOVER + self.STATE_BLOCK_ADDED
+						self.blockHovered = block
 				# We are in BLOCK_HOVER State so click = selection
 				elif self.currentState == self.STATE_BLOCK_HOVER:
 					#self.unSelectAll()
@@ -159,9 +213,11 @@ class FlowGraph(Gtk.DrawingArea):
 				# If we had a selection box, do the selection and clear the box
 				if self.selectionBox != None:
 					for block in self.blocks:
-						if block.isInside(self.selectionBox.x0,self.selectionBox.y0,\
-											self.selectionBox.x1,self.selectionBox.y1):
-							block.selected = True
+						self.selectIfInside(block,self.selectionBox.x0,self.selectionBox.y0,\
+											self.selectionBox.x1,self.selectionBox.y1)
+						#if block.isInside(self.selectionBox.x0,self.selectionBox.y0,\
+						#					self.selectionBox.x1,self.selectionBox.y1):
+						#	block.selected = True
 					self.selectionBox = None
 					self.flowGraphChanged = True
 				# Remove flags
@@ -244,3 +300,19 @@ class FlowGraph(Gtk.DrawingArea):
 
 	def up(self,block):
 		self.blocks.append(self.blocks.pop(self.blocks.index(block)))
+
+	def deleteSelectedBlocks(self):
+		toDel = []
+		for block in self.blocks:
+			if block.selected:
+				toDel.append(block)
+		# print("Going to del %d blocks" %len(toDel))
+		self.deleteBlocks(toDel)
+
+	def deleteBlocks(self,toDel):
+		for block in toDel:
+			self.blocks.remove(block)
+			self.flowGraphChanged = True
+
+	def setLibrary(self,lib):
+		self.library = lib
