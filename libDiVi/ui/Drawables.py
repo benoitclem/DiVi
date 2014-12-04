@@ -22,9 +22,8 @@ class Block:
 
 		self.subBlocks = []
 
-	def draw(self,cr):
-		for block in self.subBlocks:
-			block.draw(cr)
+	def draw(self):
+		print("Block object doesn't know how to draw itself")
 
 	def relocate(self,x,y,method = "abs"):
 		global gridSize
@@ -188,22 +187,39 @@ class Port(Block):
 	def isInside(self,x,y,x0 = None,y0 = None):
 		if (x0 == None) or (y0 == None):
 			if self.direction == self.DIR_UP:
-				return (x < (self.x+self.size/2)) and  (x > (self.x-self.size/2)) and\
-						(y < (self.y)) and  (y > (self.y-self.size))
-			elif self.direction == self.DIR_DOW:
-				return (x < (self.x+self.size/2)) and  (x > (self.x-self.size/2)) and\
-						(y < (self.y+self.size/2)) and  (y > (self.y-self.size/2))
+				return (x < (self.x + self.size/2)) and  (x > (self.x - self.size/2)) and\
+						(y < self.y) and  (y > (self.y - self.size))
+			elif self.direction == self.DIR_DOWN:
+				return (x < (self.x + self.size/2)) and  (x > (self.x - self.size/2)) and\
+						(y < (self.y + self.size)) and  (y > self.y)
 			elif self.direction == self.DIR_LEFT:
-				return False
+				return (x < (self.x)) and (x > self.x - self.size) and\
+						(y < (self.y + self.size/2)) and (y > (self.y - self.size/2))
 			elif self.direction == self.DIR_RIGHT:
-				return False
+				return (x < (self.x + self.size)) and (x > self.x) and\
+						(y < (self.y + self.size/2)) and (y > (self.y - self.size/2))
 		else:
 			return super(Port,self).isInside(x,y,x0,y0)
 
 class BoxPort(Port):
-	def __init__(self, box, direction, portType = None, portShape = Port.SHAPE_ARROW, style = None):
-		Port.__init__(self, box.x-10, box.y-10, box.ySize/10, direction, portType, portShape, style)
-		box.subBlocks.append(self)
+	def __init__(self, box, direction, num, portType = None, \
+					portShape = Port.SHAPE_ARROW, style = None):
+		(i,n) = num
+		if direction == self.DIR_UP:
+			offsetX = -box.xSize/2 + (box.xSize/(n*2))*((i*2)-1)
+			offsetY = -box.ySize/2
+		if direction == self.DIR_DOWN:
+			offsetX = -box.xSize/2 + (box.xSize/(n*2))*((i*2)-1)
+			offsetY = +box.ySize/2
+		if direction == self.DIR_LEFT:
+			offsetX = -box.xSize/2 
+			offsetY = -box.ySize/2 + (box.ySize/(n*2))*((i*2)-1)
+		if direction == self.DIR_RIGHT:
+			offsetX = +box.xSize/2
+			offsetY = -box.ySize/2 + (box.ySize/(n*2))*((i*2)-1)
+		Port.__init__(self, box.x+offsetX, box.y+offsetY, box.ySize/5, \
+						direction, portType, portShape, style)
+		self.connections = []
 
 class Connection(Block):
 	def __init__(self,x0,y0,x1,y1,style = None):
@@ -211,12 +227,13 @@ class Connection(Block):
 		self.x1 = x1
 		self.y1 = y1
 		self.selected = False
+		self.focused = False
 	
 	def draw(self, cr):
 		if self.focused:
-			self.style.setFocusedLineWidth(cr)
+			self.style.setFocusedWireWidth(cr)
 		else:
-			self.style.setLineWidth(cr)
+			self.style.setWireWidth(cr)
 		self.style.setLineColor(cr)
 		cr.move_to(self.x,self.y)
 		cr.line_to(self.x1,self.y1)
@@ -227,6 +244,12 @@ class Connection(Block):
 			return False
 		else:
 			return super(Connection,self).isInside(x,y,x0,y0)
+
+class PortToPort(Connection):
+	def __init__(self,port1,port2,style = None):
+		Connection.__init__(self,port1.x,port1.y,port2.x,port2.y,style)
+		port1.connections.append((self,0))
+		port2.connections.append((self,1))
 
 class Cartouche:
 	TOP_LEFT = 0

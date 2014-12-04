@@ -50,6 +50,7 @@ class FlowGraph(Gtk.DrawingArea):
 			self.cartouches.append(c)
 
 		self.selectionBox = None
+		self.portToConnect = None
 
 		self.mode = 0
 
@@ -110,7 +111,7 @@ class FlowGraph(Gtk.DrawingArea):
 		if self.selectionBox != None:
 			self.selectionBox.draw(cr)
 
-	def code2block(self,path):
+	def code2block(self,path,x,y):
 		if path:
 			f = open(path)
 			data = f.read()
@@ -119,27 +120,36 @@ class FlowGraph(Gtk.DrawingArea):
 				funcs = self.language.getFunctions(data)
 				for func in funcs:
 					print(func)
-					return self.buildBlock(func['name'],func['return'],func['args'])
+					return self.buildBlock(x,y,func['name'],func['return'],func['args'])
 
 	def strType2Type(self,s):
 		if s == 'int':
 			return int
 
 	# Use primitives to build a block
-	def buildBlock(self,name,ret,args):
-		(x,y) = (250,250)
-		b = Box(45,40,x,y,self.style, name = name)
-		rp = BoxPort(b,Port.DIR_UP,style=self.style)
-		return b
-			
+	def buildBlock(self,x,y,name,ret,args):
+		b = Box(40,40,x,y,self.style, name = name)
+		p = BoxPort(b,Port.DIR_RIGHT,(1,1),style=self.style)
+		b.subBlocks.append(p)
+		ap = [p]
+		for i in range(len(args)):
+			a = BoxPort(b,Port.DIR_LEFT,(i+1,len(args)),style=self.style)
+			b.subBlocks.append(a)
+			ap.append(a)
+		return [b,ap]
 
 	def keyboardEvent(self, widget, event):
 		if event.type == Gdk.EventType.KEY_PRESS:
 			if self.myFocus:
-				if event.keyval == 65307:
+				# print(event.keyval)
+				if event.keyval == 65535:		# ESC
 					print("Delete")
 					self.deleteSelectedBlocks()
-				else :
+				elif event.keyval == 65307:		# SUP
+					self.mode = 0
+					self.cartouches[3].title = "No Mode"
+					self.flowGraphChanged = True
+				else:
 					self.mode = event.keyval
 					self.cartouches[3].title = "Mode is %c" %event.keyval
 					self.flowGraphChanged = True
@@ -153,15 +163,6 @@ class FlowGraph(Gtk.DrawingArea):
 			self.grab_focus()
 		else: # this is probably useless
 			self.myFocus = False
-
-	def selectIfInside(self,block,x0,y0,x1,y1):
-		# The block itself
-		if block.isInside(x0,y0,x1,y1):
-			block.selected = True
-		# The subblocks if exist
-		if block.subBlocks:
-			if self.selectIfInside(block.subBlocks,x0,y0,x1,y1):
-				block.subBlocks.selected = True
 
 	def mouseEvent(self, widget, event):
 		# print(event.type)
@@ -188,19 +189,36 @@ class FlowGraph(Gtk.DrawingArea):
 						if self.library:
 							path = self.library.getSelectedPath()
 							print(path)
-							block = self.code2block(path);
+							block = self.code2block(path,event.x,event.y);
 					if block:
-						self.blocks.append(block)
+						if type(block) == list:
+							self.blocks.append(block[0])
+							self.blockHovered = block[0]
+							for ports in block[1]:
+								self.blocks.append(ports)
+						else:
+							self.blocks.append(block)
+							self.blockHovered = block
 						self.flowGraphChanged = True
 						self.currentState |= self.STATE_BLOCK_HOVER + self.STATE_BLOCK_ADDED
-						self.blockHovered = block
 				# We are in BLOCK_HOVER State so click = selection
 				elif self.currentState == self.STATE_BLOCK_HOVER:
 					#self.unSelectAll()
-					self.blockHovered.selected = True
+					if type(self.blockHovered) == BoxPort:
+						if self.portToConnect:
+							block = PortToPort(self.portToConnect,self.blockHovered,self.style)
+							self.blocks.append(block)
+							self.portToConnect = None
+						else:
+							self.portToConnect = self.blockHovered
+					else :
+						self.blockHovered.selected = True
+						for hoveredSubBlock in self.blockHovered.subBlocks:
+							hoveredSubBlock.selected = True
 					self.flowGraphChanged = True
 				# Unselect all blocks when clicking with no mode activated
 				else:
+					self.portToConnect = None
 					self.unSelectAll()
 
 		# We release the mouse
@@ -213,11 +231,9 @@ class FlowGraph(Gtk.DrawingArea):
 				# If we had a selection box, do the selection and clear the box
 				if self.selectionBox != None:
 					for block in self.blocks:
-						self.selectIfInside(block,self.selectionBox.x0,self.selectionBox.y0,\
-											self.selectionBox.x1,self.selectionBox.y1)
-						#if block.isInside(self.selectionBox.x0,self.selectionBox.y0,\
-						#					self.selectionBox.x1,self.selectionBox.y1):
-						#	block.selected = True
+						if block.isInside(self.selectionBox.x0,self.selectionBox.y0,\
+											self.selectionBox.x1,self.selectionBox.y1):
+							block.selected = True
 					self.selectionBox = None
 					self.flowGraphChanged = True
 				# Remove flags
