@@ -49,6 +49,7 @@ class FlowGraph(Gtk.DrawingArea):
 			c.title = "cartouche %d" %i
 			self.cartouches.append(c)
 
+		self.boxSelected = False
 		self.selectionBox = None
 		self.portToConnect = None
 
@@ -83,6 +84,9 @@ class FlowGraph(Gtk.DrawingArea):
 		| Gdk.EventMask.POINTER_MOTION_MASK
 		| Gdk.EventMask.POINTER_MOTION_HINT_MASK)
 
+	def setParser(self,parser):
+		self.parser = parser
+
 	def onDragDataReceived(self, widget, drag_context, x,y, data,info, time):
 		print(widget, drag_context, x,y, data,info, time)
 
@@ -101,9 +105,21 @@ class FlowGraph(Gtk.DrawingArea):
 	def draw(self, widget, cr):
 		# BackGround Drawing
 		self.drawBackground(cr)
-		# Block Drawing
+		# Block Drawing (connections)
 		for block in self.blocks:
-			block.draw(cr)
+			t = type(block)
+			if (t ==  PortToPort):
+				block.draw(cr)
+		# Block Drawing (ports)
+		for block in self.blocks:
+			t = type(block)
+			if (t ==  BoxPort) or (t == Port):
+				block.draw(cr)
+		# Block Drawing (Box)
+		for block in self.blocks:
+			t = type(block)
+			if (t !=  BoxPort) and (t != Port) and (t !=  PortToPort):
+				block.draw(cr)	
 		# Cartouches Drawing
 		for cartouche in self.cartouches:
 			cartouche.draw(cr, self.get_allocation().width,self.get_allocation().height)
@@ -115,7 +131,7 @@ class FlowGraph(Gtk.DrawingArea):
 		if path:
 			f = open(path)
 			data = f.read()
-			f.close
+			f.close()
 			if self.language:
 				funcs = self.language.getFunctions(data)
 				for func in funcs:
@@ -133,7 +149,7 @@ class FlowGraph(Gtk.DrawingArea):
 		b.subBlocks.append(p)
 		ap = [p]
 		for i in range(len(args)):
-			a = BoxPort(b,Port.DIR_LEFT,(i+1,len(args)),style=self.style)
+			a = BoxPort(b,Port.DIR_DOWN,(i+1,len(args)),style=self.style)
 			b.subBlocks.append(a)
 			ap.append(a)
 		return [b,ap]
@@ -191,6 +207,7 @@ class FlowGraph(Gtk.DrawingArea):
 							print(path)
 							block = self.code2block(path,event.x,event.y);
 					if block:
+						# This is a meta block made of different blocks
 						if type(block) == list:
 							self.blocks.append(block[0])
 							self.blockHovered = block[0]
@@ -203,18 +220,26 @@ class FlowGraph(Gtk.DrawingArea):
 						self.currentState |= self.STATE_BLOCK_HOVER + self.STATE_BLOCK_ADDED
 				# We are in BLOCK_HOVER State so click = selection
 				elif self.currentState == self.STATE_BLOCK_HOVER:
-					#self.unSelectAll()
+					if not self.boxSelected:
+						self.unSelectAll()
+					# This is the part responsible for BoxPort unable to be selected
+					# But allow it to create PortToPort connection
 					if type(self.blockHovered) == BoxPort:
 						if self.portToConnect:
 							block = PortToPort(self.portToConnect,self.blockHovered,self.style)
 							self.blocks.append(block)
+							self.portToConnect.action = False
 							self.portToConnect = None
 						else:
+							self.blockHovered.action = True
 							self.portToConnect = self.blockHovered
 					else :
+						self.recursiveSelect(self.blockHovered)
+						"""
 						self.blockHovered.selected = True
 						for hoveredSubBlock in self.blockHovered.subBlocks:
 							hoveredSubBlock.selected = True
+						"""
 					self.flowGraphChanged = True
 				# Unselect all blocks when clicking with no mode activated
 				else:
@@ -233,11 +258,14 @@ class FlowGraph(Gtk.DrawingArea):
 					for block in self.blocks:
 						if block.isInside(self.selectionBox.x0,self.selectionBox.y0,\
 											self.selectionBox.x1,self.selectionBox.y1):
-							block.selected = True
+							if block.directSelectable:
+								self.recursiveSelect(block)
+					self.boxSelected = True
 					self.selectionBox = None
 					self.flowGraphChanged = True
 				# Remove flags
 				else:
+					self.boxSelected = False
 					if self.currentState & self.STATE_BLOCK_ADDED:
 						self.currentState &= ~(self.STATE_BLOCK_ADDED)
 					if self.currentState & self.STATE_BLOCK_MOVED:
@@ -302,6 +330,13 @@ class FlowGraph(Gtk.DrawingArea):
 			if block.focus:
 				return block
 		return None
+
+	def recursiveSelect(self,block):
+		# Since some of subblocks are no direct selectable,
+		# select them by subblock mean
+		block.selected = True
+		for subBlock in block.subBlocks:
+			self.recursiveSelect(subBlock)
 
 	def isSelected(self):
 		for block in self.blocks:

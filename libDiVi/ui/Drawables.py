@@ -15,7 +15,12 @@ class Block:
 			self.style = style
 		self.movable = True
 		self.focused = True
+		# Tell the drawing surface block that direct selection is impossible.
+		# Selection is ok by metablock mean only (like boxport)
+		self.directSelectable = True; 
 		self.selected = True
+		# Some block are envolved in action so give them nice behavior when needed
+		self.action = False
 		# We don't apply the grid snapping when inserting block
 		self.x = x
 		self.y = y
@@ -103,7 +108,7 @@ class Box(Block):
 			self.style.setLineWidth(cr)
 		self.style.setLineColor(cr)
 
-		cr.rectangle(self.x-self.xSize/2, self.y-self.ySize/2, self.xSize, self.ySize)
+		self.style.curvedRectangle(cr,self.x-self.xSize/2, self.y-self.ySize/2, self.xSize, self.ySize)
 		cr.stroke_preserve()
 
 		if self.selected:
@@ -136,6 +141,7 @@ class Port(Block):
 	SHAPE_ARROW  = 0
 	def __init__(self, x, y, size, direction, portType = None, portShape = SHAPE_ARROW, style = None):
 		Block.__init__(self,x,y,style)
+		self.directSelectable = False
 		self.direction = direction
 		self.shape = portShape
 		self.type = portType
@@ -147,7 +153,10 @@ class Port(Block):
 			cr.set_line_width(3)
 		else:
 			cr.set_line_width(2)
-		self.style.setLineColor(cr)
+		if self.action:
+			self.style.setActionLineColor(cr)
+		else:
+			self.style.setLineColor(cr)
 		if self.shape == self.SHAPE_ARROW:
 			if self.direction == self.DIR_UP:
 				cr.move_to(self.x-self.size/2,self.y)
@@ -166,6 +175,7 @@ class Port(Block):
 				cr.line_to(self.x+self.size,self.y)
 				cr.line_to(self.x,self.y+self.size/2)
 			cr.close_path()
+			cr.set_line_join(cairo.LINE_JOIN_ROUND)
 			cr.stroke_preserve()
 
 			if self.type:
@@ -219,37 +229,63 @@ class BoxPort(Port):
 			offsetY = -box.ySize/2 + (box.ySize/(n*2))*((i*2)-1)
 		Port.__init__(self, box.x+offsetX, box.y+offsetY, box.ySize/5, \
 						direction, portType, portShape, style)
-		self.connections = []
+		self.directSelectable = False
 
-class Connection(Block):
-	def __init__(self,x0,y0,x1,y1,style = None):
-		Block.__init__(self,x0,y0,style)
-		self.x1 = x1
-		self.y1 = y1
+class PortToPort(Block):
+	def __init__(self,port1,port2,style = None,depth = 100):
+		Block.__init__(self,0,0,style)
 		self.selected = False
 		self.focused = False
-	
+		self.port1 = port1
+		self.port2 = port2
+		self.depth = depth
+
 	def draw(self, cr):
 		if self.focused:
 			self.style.setFocusedWireWidth(cr)
 		else:
 			self.style.setWireWidth(cr)
 		self.style.setLineColor(cr)
-		cr.move_to(self.x,self.y)
-		cr.line_to(self.x1,self.y1)
+		# Compute nice curve points
+		x0 = self.port1.x
+		y0 = self.port1.y
+		x3 = self.port2.x
+		y3 = self.port2.y
+		if self.port1.direction == Port.DIR_UP:
+			x1 = x0
+			y1 = y0 - self.depth
+		elif self.port1.direction == Port.DIR_DOWN:
+			x1 = x0
+			y1 = y0 + self.depth
+		elif self.port1.direction == Port.DIR_LEFT:
+			x1 = x0 - self.depth
+			y1 = y0 
+		elif self.port1.direction == Port.DIR_RIGHT:
+			x1 = x0 + self.depth
+			y1 = y0
+		if self.port2.direction == Port.DIR_UP:
+			x2 = x3
+			y2 = y3 - self.depth
+		elif self.port2.direction == Port.DIR_DOWN:
+			x2 = x3
+			y2 = y3 + self.depth
+		elif self.port2.direction == Port.DIR_LEFT:
+			x2 = x3 - self.depth
+			y2 = y3 
+		elif self.port2.direction == Port.DIR_RIGHT:
+			x2 = x3 + self.depth
+			y2 = y3
+		#print(x0,y0,x1,y1,x2,y2,x3,y3)
+		cr.move_to(x0,y0)
+		cr.curve_to(x1,y1,x2,y2,x3,y3)
 		cr.stroke()
 
 	def isInside(self,x,y,x0 = None,y0 = None):
 		if (x0 == None) or (y0 == None):
 			return False
 		else:
-			return super(Connection,self).isInside(x,y,x0,y0)
-
-class PortToPort(Connection):
-	def __init__(self,port1,port2,style = None):
-		Connection.__init__(self,port1.x,port1.y,port2.x,port2.y,style)
-		port1.connections.append((self,0))
-		port2.connections.append((self,1))
+			return self.port1.isInside(x,y,x0,y0) and self.port2.isInside(x,y,x0,y0)
+				
 
 class Cartouche:
 	TOP_LEFT = 0

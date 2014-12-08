@@ -13,11 +13,16 @@ class Classic:
 	def setWireWidth(self,cr):
 		cr.set_line_width(2)
 
+# LINE Color
+	def setActionLineColor(self,cr):
+		cr.set_source_rgb(0.2, 0.7, 0.0)
+
 	def setFocusedLineColor(self,cr):
 		cr.set_source_rgb(0.5, 0.2, 0.0)
 
 	def setLineColor(self,cr):
 		cr.set_source_rgb(0.7, 0.2, 0.0)
+# END LINE
 
 	def setSelectedFillColor(self,cr):
 		cr.set_source_rgb(0.6, 0.6, 0.6)
@@ -49,4 +54,41 @@ class Classic:
 
 	def setBackGroundColor(self,cr):
 		cr.set_source_rgb(1,1,1)
+
+	def curvedRectangle(self,cr,x0,y0,width,height,radius=102):
+		x1 = x0+width;
+		y1 = y0+height;
+		if (width/2)<radius:
+			if (height/2)<radius:
+				cr.move_to(x0, (y0 + y1)/2);
+				cr.curve_to(x0 ,y0, x0, y0, (x0 + x1)/2, y0);
+				cr.curve_to(x1, y0, x1, y0, x1, (y0 + y1)/2);
+				cr.curve_to(x1, y1, x1, y1, (x1 + x0)/2, y1);
+				cr.curve_to(x0, y1, x0, y1, x0, (y0 + y1)/2);
+			else:
+				cr.move_to(x0, y0 + radius);
+				cr.curve_to(x0 ,y0, x0, y0, (x0 + x1)/2, y0);
+				cr.curve_to(x1, y0, x1, y0, x1, y0 + radius);
+				cr.line_to(x1 , y1 - radius);
+				cr.curve_to(x1, y1, x1, y1, (x1 + x0)/2, y1);
+				cr.curve_to(x0, y1, x0, y1, x0, y1- radius);
+		else:
+			if (height/2)<radius:
+				cr.move_to(x0, (y0 + y1)/2);
+				cr.curve_to(x0 , y0, x0 , y0, x0 + radius, y0);
+				cr.line_to(x1 - radius, y0);
+				cr.curve_to(x1, y0, x1, y0, x1, (y0 + y1)/2);
+				cr.curve_to(x1, y1, x1, y1, x1 - radius, y1);
+				cr.line_to(x0 + radius, y1);
+				cr.curve_to(x0, y1, x0, y1, x0, (y0 + y1)/2);
+			else:
+				cr.move_to(x0, y0 + radius);
+				cr.curve_to(x0 , y0, x0 , y0, x0 + radius, y0);
+				cr.line_to(x1 - radius, y0);
+				cr.curve_to(x1, y0, x1, y0, x1, y0 + radius);
+				cr.line_to(x1 , y1 - radius);
+				cr.curve_to(x1, y1, x1, y1, x1 - radius, y1);
+				cr.line_to(x0 + radius, y1);
+				cr.curve_to(x0, y1, x0, y1, x0, y1- radius);
+		cr.close_path();
 
