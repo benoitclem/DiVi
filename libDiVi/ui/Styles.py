@@ -21,7 +21,7 @@ class Classic:
 		cr.set_source_rgb(0.5, 0.2, 0.0)
 
 	def setLineColor(self,cr):
-		cr.set_source_rgb(0.7, 0.2, 0.0)
+		cr.set_source_rgb(0.289, 0.562, 0.847)
 # END LINE
 
 	def setSelectedFillColor(self,cr):

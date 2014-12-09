@@ -149,7 +149,7 @@ class FlowGraph(Gtk.DrawingArea):
 		b.subBlocks.append(p)
 		ap = [p]
 		for i in range(len(args)):
-			a = BoxPort(b,Port.DIR_DOWN,(i+1,len(args)),style=self.style)
+			a = BoxPort(b,Port.DIR_LEFT,(i+1,len(args)),portType = args[i],style=self.style)
 			b.subBlocks.append(a)
 			ap.append(a)
 		return [b,ap]

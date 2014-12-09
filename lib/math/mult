@@ -1,0 +1,3 @@
+float mult(float a, float b){
+	return (float)a*b;
+}
