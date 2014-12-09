@@ -151,7 +151,7 @@ class Project(Gtk.Grid):
 			if newFileName:
 				# Create the file
 				f = open(path+'/'+newFileName,'w')
-				f.write("New " + newFileName +" ready to be edited")
+				#f.write("New " + newFileName +" ready to be edited")
 				f.close()
 				# Add The file to the treeStore
 				(model,elem) = self.getSelectedIter()

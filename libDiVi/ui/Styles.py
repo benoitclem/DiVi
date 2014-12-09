@@ -55,6 +55,9 @@ class Classic:
 	def setBackGroundColor(self,cr):
 		cr.set_source_rgb(1,1,1)
 
+	def setErrorColor(self,cr):
+		cr.set_source_rgba(0.9,0.1,0.2,0.6)
+
 	def curvedRectangle(self,cr,x0,y0,width,height,radius=102):
 		x1 = x0+width;
 		y1 = y0+height;

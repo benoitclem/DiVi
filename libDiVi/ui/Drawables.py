@@ -245,7 +245,14 @@ class PortToPort(Block):
 			self.style.setFocusedWireWidth(cr)
 		else:
 			self.style.setWireWidth(cr)
-		self.style.setLineColor(cr)
+		if self.port1.type == self.port2.type:
+			# for the connection we use the typed fill color
+			if self.port1.type == int:
+				self.style.setSelectedFillColorInt(cr)
+			else:
+				self.style.setLineColor(cr)
+		else:
+			self.style.setErrorColor(cr)
 		# Compute nice curve points
 		x0 = self.port1.x
 		y0 = self.port1.y
@@ -282,6 +289,7 @@ class PortToPort(Block):
 
 	def isInside(self,x,y,x0 = None,y0 = None):
 		if (x0 == None) or (y0 == None):
+			# don't know how to select a spline line
 			return False
 		else:
 			return self.port1.isInside(x,y,x0,y0) and self.port2.isInside(x,y,x0,y0)

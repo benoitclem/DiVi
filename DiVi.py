@@ -29,8 +29,8 @@ class TabLabel(Gtk.Box):
 		self.set_spacing(5) # spacing: [label|5px|close] 
 
 		# label 
-		label = Gtk.Label(label_text)
-		self.pack_start(label, True, True, 0)
+		self.label = Gtk.Label(label_text)
+		self.pack_start(self.label, True, True, 0)
 
 		# close button
 		button = Gtk.Button()
@@ -44,6 +44,9 @@ class TabLabel(Gtk.Box):
 
 	def button_clicked(self, button, data=None):
 		self.emit("close-clicked")
+
+	def getPath(self):
+		return self.label.get_text()
 
 class DiVi(Gtk.Window):
 
@@ -93,10 +96,21 @@ class DiVi(Gtk.Window):
 			self.hpanlib.set_position(self.wSize*2/4)
 			self.hpanpro.add(self.hpanlib)
 
+			self.FlowGraphsGrid = Gtk.Grid()
+			self.FlowGraphsToolbar = Gtk.Toolbar()
+			self.FlowGraphsGrid.attach(self.FlowGraphsToolbar,0,0,1,1)
+			self.FlowGraphButtonSave = Gtk.ToolButton.new_from_stock(Gtk.STOCK_APPLY)
+			self.FlowGraphButtonSave.connect("clicked", self.saveFlowGraph)
+			self.FlowGraphsToolbar.insert(self.FlowGraphButtonSave,0)
+
 			self.fgs = Gtk.Notebook()
+			self.fgs.set_scrollable(True)
+			self.fgs.set_hexpand(True)
+			self.fgs.set_vexpand(True)
+			self.FlowGraphsGrid.attach(self.fgs,0,1,1,1)
 			self.lib = Library("lib")
 			self.language = c()
-			self.hpanlib.add(self.fgs)
+			self.hpanlib.add(self.FlowGraphsGrid)
 			self.hpanlib.add(self.lib)
 
 			self.show_all()
@@ -109,9 +123,23 @@ class DiVi(Gtk.Window):
 		if visual != None and screen.is_composited():
 			self.set_visual(visual)
 
+	def saveFlowGraph(self,widget):	
+		page = self.fgs.get_current_page()
+		fg = self.fgs.get_nth_page(page)
+		label = self.fgs.get_tab_label(fg)
+		path = label.getPath()
+		data = fg.save()
+		f = open(path,"wb")
+		f.write(data)
+		f.close()
+		pass
+
 	def projectFileSelected(self,widget,path):
 		if os.path.isfile(path):
-			fg = FlowGraph(path,library=self.lib,language = self.language)
+			f = open(path,"rb")
+			data = f.read()
+			f.close()
+			fg = FlowGraph(path,library=self.lib,language = self.language,fgdata = data)
 			tab = TabLabel(fg.name)
 			tab.connect("close-clicked",self.closeTab,self.fgs,fg)
 			self.fgs.append_page(fg,tab)

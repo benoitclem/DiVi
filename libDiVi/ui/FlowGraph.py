@@ -1,5 +1,6 @@
 
 from gi.repository import Gtk, Gdk
+import pickle
 
 from .Styles import Classic
 from .Drawables import *
@@ -24,7 +25,7 @@ class FlowGraph(Gtk.DrawingArea):
 	MODE_PORT = 112
 	MODE_LIBRARY = 108
 
-	def __init__(self, name, parent = None, style = None, library = None, language = None):
+	def __init__(self, name, parent = None, style = None, library = None, language = None, fgdata = None):
 		Gtk.DrawingArea.__init__(self)
 		
 		#self.drag_dest_set(Gtk.DestDefaults.ALL, [Gtk.TargetEntry('STRING', Gtk.TargetFlags.SAME_APP, 0)], Gdk.DragAction.COPY)
@@ -39,7 +40,10 @@ class FlowGraph(Gtk.DrawingArea):
 		self.set_can_focus(True)
 		self.myFocus = False
 
-		self.blocks = []
+		if fgdata:
+			self.blocks = pickle.loads(fgdata)
+		else:
+			self.blocks = []
 		self.blockHovered = None
 		self.flowGraphChanged = False
 
@@ -83,6 +87,10 @@ class FlowGraph(Gtk.DrawingArea):
 		| Gdk.EventMask.KEY_RELEASE_MASK
 		| Gdk.EventMask.POINTER_MOTION_MASK
 		| Gdk.EventMask.POINTER_MOTION_HINT_MASK)
+
+	def save(self):
+		data = pickle.dumps(self.blocks)
+		return data
 
 	def setParser(self,parser):
 		self.parser = parser

@@ -1,1 +1,3 @@
-New tanh ready to be edited!
+float tanh(int r) {
+	return tanh(r);
+}
