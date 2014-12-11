@@ -10,25 +10,32 @@ class lang:
 class c(lang):
 	def __init__(self):
 		self.parser = c_parser.CParser()
-		self.funcRule = '(?P<return>\w+)\s*(?P<name>\w+)\s?\((?P<args>(?P<arg>\w+\s*\w+(,\s?)?)+)\)'
+		self.funcRule = '(?P<return>\w+)\s*(?P<name>\w+)\s?\((?P<args>(?P<arg>\w+\s*[*]?\s*\w+(,\s?)?)+)?\)'
+		self.argRule = '(?P<type>\w+)\s*(?P<pointer>[*])?\s*(?P<name>\w+)'
 
 	def matchBasicFunction(self,data):
 		m = re.match(self.funcRule,data)
 		if m:
 			f = m.groupdict()
+			print(f)
 			del f['arg']
 			if f['return'][:3] == 'int':
 				f['return'] = int
-			else:
-				f['return'] = None
-			args = [arg.strip() for arg in f['args'].split(',')]
-			targs = []
-			for arg in args:
-				if arg[:3] == 'int':
-					targs.append(int)
-				if arg[:5] == 'float':
-					targs.append(float)
-			f['args'] = targs
+			elif f['return'][:4] == 'float':
+				f['return'] = float
+			if f['args']:
+				args = [arg.strip() for arg in f['args'].split(',')]
+				targs = []
+				for arg in args:
+					p = {}
+					m = re.match(self.argRule,arg)
+					a = m.groupdict()
+					if a['type'] == 'int':
+						a['type'] = int
+					elif a['type'] == 'float':
+						a['type'] == float
+					targs.append(a)
+				f['args'] = targs
 			return f
 		else:
 			return None

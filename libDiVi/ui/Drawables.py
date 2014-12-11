@@ -24,6 +24,8 @@ class Block:
 		# We don't apply the grid snapping when inserting block
 		self.x = x
 		self.y = y
+		self.path = None
+		self.error = None
 
 		self.subBlocks = []
 
@@ -42,12 +44,19 @@ class Block:
 				self.x = x - (x % gridSize)
 				self.y = y - (y % gridSize)
 
+	def getXY(self):
+		return (self.x,self.y)
+
 	def isInside(self,x,y,x0,y0):
 		xM = max(x,x0)
 		xm = min(x,x0)
 		yM = max(y,y0)
 		ym = min(y,y0)
-		return (self.x<xM) and (xm<self.x) and (self.y<yM) and (ym<self.y)
+		(x,y) = self.getXY()
+		return (x<xM) and (xm<x) and (y<yM) and (ym<y)
+
+	def adjustBlockSize(self,cr):
+		pass
 
 class Circle(Block):
 	def __init__(self,radius,x,y,style = None):
@@ -72,7 +81,7 @@ class Circle(Block):
 			self.style.setFillColor(cr)
 		cr.fill()
 
-		cr.select_font_face("Cantarell", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)		
+		cr.select_font_facec("Cantarell", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)		
 		cr.set_font_size(13)
 		(x, y, width, height, dx, dy) = cr.text_extents(self.title)
 		cr.move_to(self.x-width/2, self.y+height/2)   
@@ -90,8 +99,12 @@ class Circle(Block):
 class Box(Block):
 	def __init__(self,xSize,ySize,x,y,style = None, name = None):
 		Block.__init__(self,x,y,style)
-		self.xSize = xSize
-		self.ySize = ySize
+
+		self.userxSize = xSize
+		self.userySize = ySize
+		self.xSize = self.userxSize
+		self.ySize = self.userySize
+		self.titleIsVisible = True
 		if name:
 			self.title = name
 		else:
@@ -99,6 +112,21 @@ class Box(Block):
 
 	def setTitle(self, name):
 		self.title = name
+
+	def adjustBlockSize(self,cr):
+		if self.titleIsVisible:
+			cr.select_font_face("Cantarell", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)		
+			cr.set_font_size(13)
+			(x, y, width, height, dx, dy) = cr.text_extents(self.title)
+
+			self.textWidth = width
+			self.textHeight = height
+		
+			self.xSize = max(width + 20,self.userxSize)
+			self.ySize = max(height + 20,self.userySize)
+		else:
+			self.xSize = self.userxSize
+			self.ySize = self.userySize
 
 	def draw(self, cr):
 
@@ -108,6 +136,7 @@ class Box(Block):
 			self.style.setLineWidth(cr)
 		self.style.setLineColor(cr)
 
+		self.adjustBlockSize(cr)
 		self.style.curvedRectangle(cr,self.x-self.xSize/2, self.y-self.ySize/2, self.xSize, self.ySize)
 		cr.stroke_preserve()
 
@@ -117,13 +146,11 @@ class Box(Block):
 			self.style.setFillColor(cr)
 		cr.fill()
 
-		cr.select_font_face("Cantarell", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)		
-		cr.set_font_size(13)
-		(x, y, width, height, dx, dy) = cr.text_extents(self.title)
-		cr.move_to(self.x-width/2, self.y+height/2)   
-		self.style.setTextColor(cr)
-		cr.show_text(self.title)
-		cr.fill()
+		if self.titleIsVisible:
+			cr.move_to(self.x-self.textWidth/2, self.y+self.textHeight/2)   
+			self.style.setTextColor(cr)
+			cr.show_text(self.title)
+			cr.fill()
 
 	def isInside(self,x,y,x0 = None,y0 = None):
 		if (x0 == None) or (y0 == None):
@@ -139,13 +166,18 @@ class Port(Block):
 	DIR_RIGHT	= 4
 
 	SHAPE_ARROW  = 0
-	def __init__(self, x, y, size, direction, portType = None, portShape = SHAPE_ARROW, style = None):
+	def __init__(self, x, y, size, direction, portType = None, portShape = SHAPE_ARROW, style = None, name = None, way = "out"):
 		Block.__init__(self,x,y,style)
 		self.directSelectable = False
 		self.direction = direction
 		self.shape = portShape
 		self.type = portType
+		self.way = way
 		self.size = size
+		self.name = name
+
+	def getXY(self):
+		return (self.x,self.y)
 
 	def draw(self, cr):
 		# For Port the line width don't come with style
@@ -157,23 +189,24 @@ class Port(Block):
 			self.style.setActionLineColor(cr)
 		else:
 			self.style.setLineColor(cr)
+		(x,y) = self.getXY()
 		if self.shape == self.SHAPE_ARROW:
 			if self.direction == self.DIR_UP:
-				cr.move_to(self.x-self.size/2,self.y)
-				cr.line_to(self.x,self.y-self.size)
-				cr.line_to(self.x+self.size/2,self.y)
+				cr.move_to(x-self.size/2,y)
+				cr.line_to(x,y-self.size)
+				cr.line_to(x+self.size/2,y)
 			elif self.direction == self.DIR_DOWN:
-				cr.move_to(self.x-self.size/2,self.y)
-				cr.line_to(self.x,self.y+self.size)
-				cr.line_to(self.x+self.size/2,self.y)
+				cr.move_to(x-self.size/2,y)
+				cr.line_to(x,y+self.size)
+				cr.line_to(x+self.size/2,y)
 			elif self.direction == self.DIR_LEFT:
-				cr.move_to(self.x,self.y-self.size/2)
-				cr.line_to(self.x-self.size,self.y)
-				cr.line_to(self.x,self.y+self.size/2)
+				cr.move_to(x,y-self.size/2)
+				cr.line_to(x-self.size,y)
+				cr.line_to(x,y+self.size/2)
 			elif self.direction == self.DIR_RIGHT:
-				cr.move_to(self.x,self.y-self.size/2)
-				cr.line_to(self.x+self.size,self.y)
-				cr.line_to(self.x,self.y+self.size/2)
+				cr.move_to(x,y-self.size/2)
+				cr.line_to(x+self.size,y)
+				cr.line_to(x,y+self.size/2)
 			cr.close_path()
 			cr.set_line_join(cairo.LINE_JOIN_ROUND)
 			cr.stroke_preserve()
@@ -196,43 +229,65 @@ class Port(Block):
 
 	def isInside(self,x,y,x0 = None,y0 = None):
 		if (x0 == None) or (y0 == None):
+			(selfx,selfy) = self.getXY()
 			if self.direction == self.DIR_UP:
-				return (x < (self.x + self.size/2)) and  (x > (self.x - self.size/2)) and\
-						(y < self.y) and  (y > (self.y - self.size))
+				return (x < (selfx + self.size/2)) and  (x > (selfx - self.size/2)) and\
+						(y < selfy) and  (y > (selfy - self.size))
 			elif self.direction == self.DIR_DOWN:
-				return (x < (self.x + self.size/2)) and  (x > (self.x - self.size/2)) and\
-						(y < (self.y + self.size)) and  (y > self.y)
+				return (x < (selfx + self.size/2)) and  (x > (selfx - self.size/2)) and\
+						(y < (selfy + self.size)) and  (y > selfy)
 			elif self.direction == self.DIR_LEFT:
-				return (x < (self.x)) and (x > self.x - self.size) and\
-						(y < (self.y + self.size/2)) and (y > (self.y - self.size/2))
+				return (x < (selfx)) and (x > selfx - self.size) and\
+						(y < (selfy + self.size/2)) and (y > (selfy - self.size/2))
 			elif self.direction == self.DIR_RIGHT:
-				return (x < (self.x + self.size)) and (x > self.x) and\
-						(y < (self.y + self.size/2)) and (y > (self.y - self.size/2))
+				return (x < (selfx + self.size)) and (x > selfx) and\
+						(y < (selfy + self.size/2)) and (y > (selfy - self.size/2))
 		else:
 			return super(Port,self).isInside(x,y,x0,y0)
 
 class BoxPort(Port):
 	def __init__(self, box, direction, num, portType = None, \
-					portShape = Port.SHAPE_ARROW, style = None):
-		(i,n) = num
-		if direction == self.DIR_UP:
-			offsetX = -box.xSize/2 + (box.xSize/(n*2))*((i*2)-1)
-			offsetY = -box.ySize/2
-		if direction == self.DIR_DOWN:
-			offsetX = -box.xSize/2 + (box.xSize/(n*2))*((i*2)-1)
-			offsetY = +box.ySize/2
-		if direction == self.DIR_LEFT:
-			offsetX = -box.xSize/2 
-			offsetY = -box.ySize/2 + (box.ySize/(n*2))*((i*2)-1)
-		if direction == self.DIR_RIGHT:
-			offsetX = +box.xSize/2
-			offsetY = -box.ySize/2 + (box.ySize/(n*2))*((i*2)-1)
-		Port.__init__(self, box.x+offsetX, box.y+offsetY, box.ySize/5, \
-						direction, portType, portShape, style)
+					portShape = Port.SHAPE_ARROW, style = None,name = None, way = 'out'):
+		self.num = num
+		self.box = box
+		self.direction = direction
+		Port.__init__(self, box.x, box.y, box.ySize/5, \
+						direction, portType, portShape, style, name, way)
 		self.directSelectable = False
 
+	def setNum(self, num):
+		self.num = num
+
+	def getXY(self):
+		(i,n) = self.num
+		if self.direction == self.DIR_UP:
+			offsetX = -self.box.xSize/2 + (self.box.xSize/(n*2))*((i*2)-1)
+			offsetY = -self.box.ySize/2
+		if self.direction == self.DIR_DOWN:
+			offsetX = -self.box.xSize/2 + (self.box.xSize/(n*2))*((i*2)-1)
+			offsetY = +self.box.ySize/2
+		if self.direction == self.DIR_LEFT:
+			offsetX = -self.box.xSize/2 
+			offsetY = -self.box.ySize/2 + (self.box.ySize/(n*2))*((i*2)-1)
+		if self.direction == self.DIR_RIGHT:
+			offsetX = +self.box.xSize/2
+			offsetY = -self.box.ySize/2 + (self.box.ySize/(n*2))*((i*2)-1)
+		return (self.box.x+offsetX,self.box.y+offsetY)
+
+	def getConnectionPointXY(self):
+		(x,y) = self.getXY()
+		if self.direction == self.DIR_UP:
+			y -= self.size
+		if self.direction == self.DIR_DOWN:
+			y += self.size
+		if self.direction == self.DIR_LEFT:
+			x -= self.size
+		if self.direction == self.DIR_RIGHT:
+			x += self.size
+		return(x,y)
+
 class PortToPort(Block):
-	def __init__(self,port1,port2,style = None,depth = 100):
+	def __init__(self,port1,port2,style = None,depth = None):
 		Block.__init__(self,0,0,style)
 		self.selected = False
 		self.focused = False
@@ -240,12 +295,16 @@ class PortToPort(Block):
 		self.port2 = port2
 		self.depth = depth
 
+	def isValidConnection(self):
+		return (self.port1.type != self.port2.type) or (self.port1.way == self.port2.way)
+
 	def draw(self, cr):
-		if self.focused:
-			self.style.setFocusedWireWidth(cr)
+		if self.selected or self.focused:
+			self.style.setSelectedWireWidth(cr)
 		else:
 			self.style.setWireWidth(cr)
-		if self.port1.type == self.port2.type:
+		self.error = self.isValidConnection()
+		if not self.error:
 			# for the connection we use the typed fill color
 			if self.port1.type == int:
 				self.style.setSelectedFillColorInt(cr)
@@ -254,42 +313,48 @@ class PortToPort(Block):
 		else:
 			self.style.setErrorColor(cr)
 		# Compute nice curve points
-		x0 = self.port1.x
-		y0 = self.port1.y
-		x3 = self.port2.x
-		y3 = self.port2.y
+		x0,y0 = self.port1.getConnectionPointXY()
+		x3,y3 = self.port2.getConnectionPointXY()
+		# Compute depth
+		if self.depth == None:
+			xM = max(x0,x3)
+			yM = max(y0,y3)
+			xm = min(x0,x3)
+			ym = min(y0,y3)
+			depth = math.sqrt((xM - xm) * (xM - xm) + (yM - ym) * (yM - ym))/1.5
+		else:
+			depth = self.depth
 		if self.port1.direction == Port.DIR_UP:
 			x1 = x0
-			y1 = y0 - self.depth
+			y1 = y0 - depth
 		elif self.port1.direction == Port.DIR_DOWN:
 			x1 = x0
-			y1 = y0 + self.depth
+			y1 = y0 + depth
 		elif self.port1.direction == Port.DIR_LEFT:
-			x1 = x0 - self.depth
+			x1 = x0 - depth
 			y1 = y0 
 		elif self.port1.direction == Port.DIR_RIGHT:
-			x1 = x0 + self.depth
+			x1 = x0 + depth
 			y1 = y0
 		if self.port2.direction == Port.DIR_UP:
 			x2 = x3
-			y2 = y3 - self.depth
+			y2 = y3 - depth
 		elif self.port2.direction == Port.DIR_DOWN:
 			x2 = x3
-			y2 = y3 + self.depth
+			y2 = y3 + depth
 		elif self.port2.direction == Port.DIR_LEFT:
-			x2 = x3 - self.depth
+			x2 = x3 - depth
 			y2 = y3 
 		elif self.port2.direction == Port.DIR_RIGHT:
-			x2 = x3 + self.depth
+			x2 = x3 + depth
 			y2 = y3
-		#print(x0,y0,x1,y1,x2,y2,x3,y3)
 		cr.move_to(x0,y0)
 		cr.curve_to(x1,y1,x2,y2,x3,y3)
 		cr.stroke()
 
 	def isInside(self,x,y,x0 = None,y0 = None):
 		if (x0 == None) or (y0 == None):
-			# don't know how to select a spline line
+			# don't know how to select a spline line with just one pixel
 			return False
 		else:
 			return self.port1.isInside(x,y,x0,y0) and self.port2.isInside(x,y,x0,y0)

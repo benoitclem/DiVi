@@ -1,5 +1,5 @@
 
-from gi.repository import Gtk, Gdk
+from gi.repository import Gtk, Gdk, GObject
 import os
 
 class NameChooserDialog(Gtk.Dialog):
@@ -17,6 +17,11 @@ class NameChooserDialog(Gtk.Dialog):
 		self.show_all()
 
 class Library(Gtk.Paned):
+
+	__gsignals__ = {
+		"editor-saved": (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, (str,)),
+	}
+
 	def __init__(self,path):
 
 		self.path = path
@@ -243,6 +248,7 @@ class Library(Gtk.Paned):
 		path = self.getSelectedPath()
 		print("saving now to " + path)
 		self.saveEditorToFile(path)
+		self.emit("editor-saved",path)
 
 	def buildEditor(self):
 		self.editorGrid = Gtk.Grid()

@@ -7,6 +7,9 @@ class Classic:
 	def setLineWidth(self,cr):
 		cr.set_line_width(4)
 
+	def setSelectedWireWidth(self,cr):
+		cr.set_line_width(4)
+
 	def setFocusedWireWidth(self,cr):
 		cr.set_line_width(4)
 

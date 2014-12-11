@@ -111,6 +111,9 @@ class FlowGraph(Gtk.DrawingArea):
 		cr.fill()
 
 	def draw(self, widget, cr):
+		# Request the block to adjust their sizes
+		for block in self.blocks:
+			block.adjustBlockSize(cr)
 		# BackGround Drawing
 		self.drawBackground(cr)
 		# Block Drawing (connections)
@@ -123,11 +126,11 @@ class FlowGraph(Gtk.DrawingArea):
 			t = type(block)
 			if (t ==  BoxPort) or (t == Port):
 				block.draw(cr)
-		# Block Drawing (Box)
+		# Block Drawing (Boxes)
 		for block in self.blocks:
 			t = type(block)
 			if (t !=  BoxPort) and (t != Port) and (t !=  PortToPort):
-				block.draw(cr)	
+				block.draw(cr)
 		# Cartouches Drawing
 		for cartouche in self.cartouches:
 			cartouche.draw(cr, self.get_allocation().width,self.get_allocation().height)
@@ -135,31 +138,90 @@ class FlowGraph(Gtk.DrawingArea):
 		if self.selectionBox != None:
 			self.selectionBox.draw(cr)
 
-	def code2block(self,path,x,y):
+	def update(self,path):
+		if path:
+			for i in range(len(self.blocks)):
+				print(self.blocks[i].path)
+				if self.blocks[i].path == path:
+					self.flowGraphChanged = True
+					print("Matched a block")
+					# Get Block Parameters
+					self.updateBlock(path,self.blocks[i])
+			self.refresh()
+
+	def updateBlock(self,path,block):
+		func = self.getPrototype(path)
+		if func:
+			block.title = func[0]['name']
+			print(len(block.subBlocks))
+		
+	def getPrototype(self,path):
 		if path:
 			f = open(path)
 			data = f.read()
 			f.close()
 			if self.language:
 				funcs = self.language.getFunctions(data)
-				for func in funcs:
-					print(func)
-					return self.buildBlock(x,y,func['name'],func['return'],func['args'])
+				return funcs
+		return None
 
-	def strType2Type(self,s):
-		if s == 'int':
-			return int
+	def code2block(self,path,x,y):
+		funcs = self.getPrototype(path)
+		if funcs:
+			for func in funcs:
+				print(func)
+				b = self.buildBlock(x,y,func['name'],func['return'],func['args'])
+				b[0].path = path
+				return b
 
 	# Use primitives to build a block
 	def buildBlock(self,x,y,name,ret,args):
 		b = Box(40,40,x,y,self.style, name = name)
-		p = BoxPort(b,Port.DIR_RIGHT,(1,1),style=self.style)
-		b.subBlocks.append(p)
-		ap = [p]
-		for i in range(len(args)):
-			a = BoxPort(b,Port.DIR_LEFT,(i+1,len(args)),portType = args[i],style=self.style)
-			b.subBlocks.append(a)
-			ap.append(a)
+
+		iPointers = []
+		iNormals = []
+		ap = []
+
+		if args:
+			# Compute number of inputing pointers
+			for i in range(len(args)):
+				if args[i]["pointer"]:
+					iPointers.append(i)
+				else:
+					iNormals.append(i)
+		
+		# If pointers make the block orientation UP/DOWN
+		#else RIGHT/LEFT (UP/DOWN used by pointers)
+		if len(iPointers):
+			orientInputs = Port.DIR_UP
+			orientReturn = Port.DIR_DOWN
+		else:
+			orientInputs = Port.DIR_LEFT
+			orientReturn = Port.DIR_RIGHT
+
+		print(ret)
+		if ret != 'void':
+			# Put the return port
+			p = BoxPort(b,orientReturn,(1,1),portType = ret, style = self.style, name = 'return',way = 'out')
+			b.subBlocks.append(p)
+			ap.append(p)
+		
+		if args:
+			# Put the input ports (not pointers)
+			for i in range(len(iNormals)):
+				a = BoxPort(b,orientInputs,(i+1,len(iNormals)),portType = args[i]["type"],style=self.style,name=args[i]["name"], way = 'in')
+				b.subBlocks.append(a)
+				ap.append(a)
+
+			# Put the input ports (pointers)
+			for i in range(len(iPointers)):
+				a = BoxPort(b,Port.DIR_LEFT,(i+1,len(iPointers)),portType = args[i]["type"],style=self.style,name=args[i]["name"],way = 'in')
+				b.subBlocks.append(a)
+				ap.append(a)
+				a = BoxPort(b,Port.DIR_RIGHT,(i+1,len(iPointers)),portType = args[i]["type"],style=self.style,name=args[i]["name"],way = 'out')
+				b.subBlocks.append(a)
+				ap.append(a)
+
 		return [b,ap]
 
 	def keyboardEvent(self, widget, event):
@@ -375,3 +437,12 @@ class FlowGraph(Gtk.DrawingArea):
 
 	def setLibrary(self,lib):
 		self.library = lib
+
+	def renderCode(self):
+		for block in self.blocks:
+			if block.directSelectable:
+				print(block)
+
+
+
+

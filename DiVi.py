@@ -99,9 +99,14 @@ class DiVi(Gtk.Window):
 			self.FlowGraphsGrid = Gtk.Grid()
 			self.FlowGraphsToolbar = Gtk.Toolbar()
 			self.FlowGraphsGrid.attach(self.FlowGraphsToolbar,0,0,1,1)
+
 			self.FlowGraphButtonSave = Gtk.ToolButton.new_from_stock(Gtk.STOCK_APPLY)
 			self.FlowGraphButtonSave.connect("clicked", self.saveFlowGraph)
 			self.FlowGraphsToolbar.insert(self.FlowGraphButtonSave,0)
+
+			self.FlowGraphButtonExec = Gtk.ToolButton.new_from_stock(Gtk.STOCK_EXECUTE)
+			self.FlowGraphButtonExec.connect("clicked", self.execFlowGraph)
+			self.FlowGraphsToolbar.insert(self.FlowGraphButtonExec,1)
 
 			self.fgs = Gtk.Notebook()
 			self.fgs.set_scrollable(True)
@@ -113,6 +118,8 @@ class DiVi(Gtk.Window):
 			self.hpanlib.add(self.FlowGraphsGrid)
 			self.hpanlib.add(self.lib)
 
+			self.lib.connect("editor-saved",self.editorSaved)
+
 			self.show_all()
 
 	def confUi():
@@ -123,16 +130,30 @@ class DiVi(Gtk.Window):
 		if visual != None and screen.is_composited():
 			self.set_visual(visual)
 
-	def saveFlowGraph(self,widget):	
+	def editorSaved(self,widget,s):
+		for i in range(self.fgs.get_n_pages()):
+			fg = self.fgs.get_nth_page(i)
+			fg.update(s)
+		print(s)
+
+	def getCurrentFlowGraph(self):
 		page = self.fgs.get_current_page()
-		fg = self.fgs.get_nth_page(page)
-		label = self.fgs.get_tab_label(fg)
-		path = label.getPath()
-		data = fg.save()
-		f = open(path,"wb")
-		f.write(data)
-		f.close()
-		pass
+		return self.fgs.get_nth_page(page)
+
+	def saveFlowGraph(self,widget):	
+		fg = self.getCurrentFlowGraph()
+		if fg:
+			label = self.fgs.get_tab_label(fg)
+			path = label.getPath()
+			data = fg.save()
+			f = open(path,"wb")
+			f.write(data)
+			f.close()
+	
+	def execFlowGraph(self,widget):
+		fg = self.getCurrentFlowGraph()
+		if fg:
+			code = fg.renderCode()
 
 	def projectFileSelected(self,widget,path):
 		if os.path.isfile(path):
