@@ -18,12 +18,22 @@ class FlowGraph(Gtk.DrawingArea):
 	STATE_BLOCK_HOVER = 0x01
 	STATE_BLOCK_ADDED = 0x02
 	STATE_BLOCK_MOVED = 0x04
+	STATE_WIRE_EDIT   = 0x08
 
 	MODE_BLOCK = 98
 	MODE_CIRCLE = 115
 	MODE_CONNECTION = 99
 	MODE_PORT = 112
 	MODE_LIBRARY = 108
+
+	BOX_MASK = 0x01
+	CIRCLE_MASK = 0x02
+	WIRE_MASK = 0x04
+	POINT_MASK = 0x08
+	PORT_MASK = 0x10
+
+	ALL_MASK = 0x1F
+	WE_MASK = PORT_MASK 	# WireEdition
 
 	def __init__(self, name, parent = None, style = None, library = None, language = None, fgdata = None):
 		Gtk.DrawingArea.__init__(self)
@@ -55,7 +65,7 @@ class FlowGraph(Gtk.DrawingArea):
 
 		self.boxSelected = False
 		self.selectionBox = None
-		self.portToConnect = None
+		self.wireEditionCurrentWire = None
 
 		self.mode = 0
 
@@ -261,7 +271,11 @@ class FlowGraph(Gtk.DrawingArea):
 				self.leftClickWhereBegin = [event.x, event.y]
 				# We are idle and with BLOCK | CICLE | PORT | CONNECTION activated
 				if self.currentState == self.STATE_IDLE and\
-					 (self.mode == self.MODE_BLOCK or self.mode == self.MODE_CIRCLE or self.mode == self.MODE_CONNECTION or self.mode == self.MODE_PORT or self.mode == self.MODE_LIBRARY):
+					 (self.mode == self.MODE_BLOCK or \
+						self.mode == self.MODE_CIRCLE or\
+						self.mode == self.MODE_CONNECTION or\
+						self.mode == self.MODE_PORT or \
+						self.mode == self.MODE_LIBRARY):
 					block = None
 					if self.mode == self.MODE_BLOCK:			
 						block = Box(45,40,event.x,event.y,self.style)
@@ -288,21 +302,38 @@ class FlowGraph(Gtk.DrawingArea):
 							self.blockHovered = block
 						self.flowGraphChanged = True
 						self.currentState |= self.STATE_BLOCK_HOVER + self.STATE_BLOCK_ADDED
+
+				# Well we are in Wire Edit mode
+				if self.currentState & self.STATE_WIRE_EDIT:
+					# When Hoverin something (in wire edit only port could be selected)
+					# So we know here is a port that is hovered
+					if self.currentState & self.STATE_BLOCK_HOVER:
+						self.wireEditionCurrentWire.finish(self.blockHovered)
+						# We did make the last connection
+						self.currentState &= ~(self.STATE_WIRE_EDIT)
+					else:
+						p0 = Point(event.x,event.y)
+						self.wireEditionCurrentWire.addPoint(p0)
+						self.blocks.append(p0)
+						p1 = Point(event.x,event.y)
+						self.wireEditionCurrentWire.addPoint(p1)
+						self.blocks.append(p1)
+					self.flowGraphChanged = True
+
 				# We are in BLOCK_HOVER State so click = selection
-				elif self.currentState == self.STATE_BLOCK_HOVER:
+				elif self.currentState & self.STATE_BLOCK_HOVER:
 					if not self.boxSelected:
 						self.unSelectAll()
 					# This is the part responsible for BoxPort unable to be selected
 					# But allow it to create PortToPort connection
-					if type(self.blockHovered) == BoxPort:
-						if self.portToConnect:
-							block = PortToPort(self.portToConnect,self.blockHovered,self.style)
-							self.blocks.append(block)
-							self.portToConnect.action = False
-							self.portToConnect = None
-						else:
-							self.blockHovered.action = True
-							self.portToConnect = self.blockHovered
+					if (type(self.blockHovered) == BoxPort) and \
+							not (self.currentState & self.STATE_WIRE_EDIT):
+						print("Entering WireEdition")
+						block = Wire(self.blockHovered,self.style)
+						self.wireEditionCurrentWire = block
+						self.blocks.append(block)
+						self.blocks += self.wireEditionCurrentWire.points
+						self.currentState |= self.STATE_WIRE_EDIT
 					else :
 						self.recursiveSelect(self.blockHovered)
 						"""
@@ -311,10 +342,10 @@ class FlowGraph(Gtk.DrawingArea):
 							hoveredSubBlock.selected = True
 						"""
 					self.flowGraphChanged = True
-				# Unselect all blocks when clicking with no mode activated
+				# Unselect all blocks when clicking with no mode activated			
 				else:
-					self.portToConnect = None
 					self.unSelectAll()
+
 
 		# We release the mouse
 		elif event.type == Gdk.EventType.BUTTON_RELEASE:
@@ -357,24 +388,34 @@ class FlowGraph(Gtk.DrawingArea):
 					self.selectionBox = SelectionBox(x0,y0,event.x,event.y,self.style)
 					self.flowGraphChanged = True
 				# We are idle search if we are not going to HOVER somethin'
-				for block in self.blocks:
-					if block.isInside(event.x,event.y):
-						block.focused = True
-						self.flowGraphChanged = True
-						self.up(block)
-						self.currentState |= self.STATE_BLOCK_HOVER
-						self.blockHovered = block
-						# only one block is hovered at a time 
-						# this break is important as we are messing 
-						# with blocks order in up() method
-						break
-			elif self.currentState == self.STATE_BLOCK_HOVER:
+				self.isHovering(event,self.ALL_MASK)
+			if self.currentState & self.STATE_BLOCK_HOVER:
 				# Moving out a block => deHOVER
 				if not self.blockHovered.isInside(event.x,event.y):
 					self.blockHovered.focused = False
 					self.flowGraphChanged = True
 					self.currentState &= ~(self.STATE_BLOCK_HOVER)
 					self.blockHovered = None
+			if self.currentState & self.STATE_WIRE_EDIT:
+				lp = self.wireEditionCurrentWire.getLast3Points()
+				# lp[0] never moves
+				if(type(lp[0]) == BoxPort):
+					(x,y) = lp[0].getConnectionPointXY()
+				else:
+					(x,y) = lp[0].getXY()
+				dx = x - event.x
+				dy = y - event.y
+				if abs(dx) > abs(dy):
+					lp[1].relocate(x-dx,y)
+					lp[2].relocate(x-dx,y-dy)
+				else:
+					lp[1].relocate(x,y-dy)
+					lp[2].relocate(x-dx,y-dy)
+				# These 1 and 2 can move
+				print(lp[1],lp[2])
+				self.flowGraphChanged = True
+				# Wile Wire edition, the hovering feature should work
+				self.isHovering(event,self.WE_MASK)
 			# ==== ACTIONS ====
 			# We do the block move
 			if self.leftClickState:
@@ -394,6 +435,35 @@ class FlowGraph(Gtk.DrawingArea):
 				self.flowGraphChanged = True
 
 		self.refresh()
+
+	def isHovering(self,event,mask):
+		for block in self.blocks:
+			if self.blockAuthorized(block,mask):
+				if block.isInside(event.x,event.y):
+					block.focused = True
+					self.flowGraphChanged = True
+					self.up(block)
+					self.currentState |= self.STATE_BLOCK_HOVER
+					self.blockHovered = block
+					# only one block is hovered at a time 
+					# this break is important as we are messing 
+					# with blocks order in up() method
+					break
+
+	def blockAuthorized(self,block,mask):
+		#print(block,"%02x"%mask)
+		if (type(block) == Box) and (mask & self.BOX_MASK):
+			return True
+		elif (type(block) == Circle) and (mask & self.CIRCLE_MASK):
+			return True
+		elif (type(block) == Wire) and (mask & self.WIRE_MASK):
+			return True
+		elif (type(block) == Point) and (mask & self.POINT_MASK):
+			return True
+		elif ((type(block) == Port) or (type(block) == BoxPort)) and (mask & self.PORT_MASK):
+			return True
+		else:
+			return False
 
 	def haveFocus(self):
 		for block in self.blocks:

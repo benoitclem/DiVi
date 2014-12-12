@@ -16,6 +16,15 @@ class Classic:
 	def setWireWidth(self,cr):
 		cr.set_line_width(2)
 
+# POINT 
+	def setPointWireWidth(self,cr):
+		cr.set_line_width(1)
+
+	def setPointWireColor(self,cr):
+		cr.set_source_rgb(0.1, 0.1, 0.1)
+
+# END POINT
+
 # LINE Color
 	def setActionLineColor(self,cr):
 		cr.set_source_rgb(0.2, 0.7, 0.0)

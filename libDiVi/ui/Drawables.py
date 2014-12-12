@@ -47,13 +47,16 @@ class Block:
 	def getXY(self):
 		return (self.x,self.y)
 
-	def isInside(self,x,y,x0,y0):
-		xM = max(x,x0)
-		xm = min(x,x0)
-		yM = max(y,y0)
-		ym = min(y,y0)
-		(x,y) = self.getXY()
-		return (x<xM) and (xm<x) and (y<yM) and (ym<y)
+	def isInside(self,x,y,x0 = None ,y0 = None ):
+		if (x0 != None) and (y0 != None):
+			xM = max(x,x0)
+			xm = min(x,x0)
+			yM = max(y,y0)
+			ym = min(y,y0)
+			(x,y) = self.getXY()
+			return (x<xM) and (xm<x) and (y<yM) and (ym<y)
+		else:
+			return False
 
 	def adjustBlockSize(self,cr):
 		pass
@@ -245,6 +248,20 @@ class Port(Block):
 		else:
 			return super(Port,self).isInside(x,y,x0,y0)
 
+# A point is something that don't have visual but can react to mouse
+class Point(Box):
+	def __init__(self,x,y,size = 10):
+		Box.__init__(self,size,size,x,y,name = "POINT")
+		self.size = size
+	
+	def draw(self,cr):
+		self.style.setPointWireWidth(cr)
+		self.style.setPointWireColor(cr)
+		self.style.curvedRectangle(cr,self.x-self.size/2, self.y-self.size/2, self.size, self.size)
+		cr.stroke()		
+		pass
+	
+
 class BoxPort(Port):
 	def __init__(self, box, direction, num, portType = None, \
 					portShape = Port.SHAPE_ARROW, style = None,name = None, way = 'out'):
@@ -285,6 +302,64 @@ class BoxPort(Port):
 		if self.direction == self.DIR_RIGHT:
 			x += self.size
 		return(x,y)
+
+class Wire(Block):
+	def __init__(self,port1,style = None):
+		Block.__init__(self,0,0,style)
+		self.port1 = port1
+		self.port2 = None
+		(x,y) = self.port1.getXY()
+		p1 = Point(x,y)
+		p2 = Point(x,y)
+		self.points = [p1,p2]
+
+	def isValidConnection(self):
+		if self.port2:
+			return (self.port1.type != self.port2.type) or (self.port1.way == self.port2.way)
+		else:
+			return False
+
+	def draw(self,cr):
+		if self.selected or self.focused:
+			self.style.setSelectedWireWidth(cr)
+		else:
+			self.style.setWireWidth(cr)
+		self.error = self.isValidConnection()
+		if not self.error:
+			# for the connection we use the typed fill color
+			if self.port1.type == int:
+				self.style.setSelectedFillColorInt(cr)
+			else:
+				self.style.setLineColor(cr)
+		else:
+			self.style.setErrorColor(cr)
+		(x,y) = self.port1.getConnectionPointXY()
+		cr.move_to(x,y)
+		if len(self.points):
+			for point in self.points:
+				(x,y) = point.getXY()
+				cr.line_to(x,y)
+		if self.port2:
+			(x,y) = self.port2.getConnectionPointXY()
+			cr.line_to(x,y)
+		if (len(self.points) != 0) or (self.port2 != None):
+			cr.set_line_join(cairo.LINE_JOIN_ROUND)
+			cr.stroke()
+
+	def addPoint(self,point):
+		self.points.append(point)
+
+	def finish(self,port2):
+		self.port2 = port2
+
+	def getLast3Points(self):
+		if len(self.points) >= 3:
+			return self.points[-3:]
+		else:
+			return [self.port1] + self.points
+
+	def isInside(self,x,y,x0 = None,y0 = None):
+		return super(Wire,self).isInside(x,y,x0,y0)
 
 class PortToPort(Block):
 	def __init__(self,port1,port2,style = None,depth = None):
